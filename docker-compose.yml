@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  streamlit:
+    build:
+      dockerfile: ./Dockerfile
+      context: ./
+    ports:
+      - '8501:8501'
+    volumes:
+      - './:/app:delegated'
+    command: ["streamlit", "run", "streamlit_app.py"]
