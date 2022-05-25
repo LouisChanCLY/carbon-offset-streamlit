@@ -90,7 +90,7 @@ def contribution_history(project_id):
     # get the last page number
     pagination = tree.xpath(CONTRIBUTION_HISTORY_PAGINATION_XPATH)
     if len(pagination) == 0:
-        last_page = 2
+        last_page = 1 # so that range(2, 2) will yield nothing
     elif pagination[-1].text != "Last":
         last_page = int(pagination[-2].get("href").split("pageNumber=")[-1])
     else:
