@@ -102,7 +102,7 @@ def contribution_history(project_id):
         if project_id in con["project_id"]:
             contributions.append(con)
 
-    for i in (2, last_page):
+    for i in range(2, last_page + 1):
         results = requests.get(
             CONTRIBUTION_REDIRECT_URL.format(project_id=project_id, page=i)
         ).text
