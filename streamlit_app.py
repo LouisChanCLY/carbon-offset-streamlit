@@ -1,12 +1,13 @@
 from collections import namedtuple
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Tuple
+import re
 
 import pandas as pd
 import requests
 import streamlit as st
-from lxml import html
+from lxml import html, etree
 
 from constants import *
 
@@ -90,7 +91,7 @@ def contribution_history(project_id):
     # get the last page number
     pagination = tree.xpath(CONTRIBUTION_HISTORY_PAGINATION_XPATH)
     if len(pagination) == 0:
-        last_page = 1 # so that range(2, 2) will yield nothing
+        last_page = 1  # so that range(2, 2) will yield nothing
     elif pagination[-1].text != "Last":
         last_page = int(pagination[-2].get("href").split("pageNumber=")[-1])
     else:
@@ -104,7 +105,7 @@ def contribution_history(project_id):
 
     for i in range(2, last_page + 1):
         results = requests.get(
-            CONTRIBUTION_REDIRECT_URL.format(project_id=project_id, page=i)
+            CONTRIBUTION_HISTORY_URL.format(project_id=project_id, page=i)
         ).text
         tree = html.fromstring(results)
         for card in tree.xpath(CONTRIBUTION_CARD_XPATH):
@@ -117,6 +118,108 @@ def contribution_history(project_id):
     # df = pd.DataFrame([dict(row) for row in rows_raw])
     # return df
     return pd.DataFrame(contributions)
+
+
+def get_xpath_text(tree: etree, xpath: str) -> str:
+
+    return tree.xpath(xpath)[0].text_content()
+
+
+def get_xpath_attrib(tree: etree, xpath: str, attrib: str = "text") -> str:
+
+    if attrib == "text":
+        return get_xpath_text(tree, xpath)
+
+    return tree.xpath(xpath)[0].get(attrib)
+
+
+def parse_attestation(tree: etree) -> Dict:
+
+    return {
+        "project_id": int(get_xpath_text(tree, "td[1]/a")),
+        "project_url": get_xpath_attrib(tree, "td[1]/a", "href"),
+        "project_name": get_xpath_text(tree, "td[2]"),
+        "project_type": get_xpath_text(tree, "td[3]"),
+        "host_country": get_xpath_text(tree, "td[4]"),
+        "quantity": float(get_xpath_text(tree, "td[5]").replace(",", "")),
+        "unit": get_xpath_text(tree, "td[6]"),
+        "reason": get_xpath_text(tree, "td[7]"),
+        "contribution_date": datetime.strptime(
+            get_xpath_text(tree, "td[8]/span[2]"), "%d/%m/%Y"
+        ),
+        "certificate_id": VC_CERTIFICATE.format(
+            **next(
+                re.finditer(ATTESTATION_ID_REGEX, get_xpath_text(tree, "td[8]/span[1]"))
+            )
+        ),
+        "certificate_url": get_xpath_attrib(tree, "td[9]/a", "href"),
+    }
+
+
+def parse_attestation_2018(tree: etree) -> Dict:
+
+    return {
+        "project_id": int(get_xpath_text(tree, "td[1]/a")),
+        "project_url": get_xpath_attrib(tree, "td[1]/a", "href"),
+        "project_name": get_xpath_text(tree, "td[2]"),
+        "project_type": get_xpath_text(tree, "td[3]"),
+        "host_country": get_xpath_text(tree, "td[4]"),
+        "quantity": float(get_xpath_text(tree, "td[5]").replace(",", "")),
+        "unit": get_xpath_text(tree, "td[6]"),
+        "reason": get_xpath_text(tree, "td[7]"),
+        "contribution_date": datetime.strptime(
+            get_xpath_text(tree, "td[8]"), "%d/%m/%Y"
+        ),
+        "certificate_id": VC_CERTIFICATE.format(
+            **next(
+                re.finditer(
+                    ATTESTATION_ID_REGEX, get_xpath_attrib(tree, "td[9]/a", "href")
+                )
+            )
+        ),
+        "certificate_url": get_xpath_attrib(tree, "td[9]/a", "href"),
+    }
+
+
+def attestation_history() -> pd.DataFrame:
+
+    attestation = []
+
+    results = requests.get(ATTESTATION_ARCHIVE_URL).text
+    tree = html.fromstring(results)
+    attestation.extend([parse_attestation(r) for r in tree.xpath(ATTESTATION_XPATH)])
+
+    results = requests.get(ATTESTATION_2018_URL).text
+    tree = html.fromstring(results)
+    attestation.extend([parse_attestation(r) for r in tree.xpath(ATTESTATION_XPATH)])
+
+    results = requests.get(ATTESTATION_URL).text
+    tree = html.fromstring(results)
+    attestation.extend([parse_attestation(r) for r in tree.xpath(ATTESTATION_XPATH)])
+
+    attestation = pd.DataFrame.from_dict(attestation)
+    attestation = attestation.sort_values(
+        "contribution_date", ascending=False
+    ).reset_index(drop=True)
+
+    return attestation
+
+
+def project_availability(project_url: str) -> Tuple[str, str]:
+
+    tree = html.fromstring(requests.get(project_url).text)
+
+    availability = tree.xpath(PROJECT_AVAILABILITY_XPATH)
+
+    if len(availability) == 0:
+        return "N/A", "N/A"
+    elif availability[0].text_content() == "":
+        return "N/A", "N/A"
+
+    return (
+        availability[0].xpath(PROJECT_AVAILABILITY_PRICE_SUB_XPATH)[0],
+        availability[0].xpath(PROJECT_AVAILABILITY_TONNES_SUB_XPATH)[0],
+    )
 
 
 st.set_page_config(layout="wide")
@@ -136,11 +239,31 @@ registration_date, project_url, project_name = project_info(project_id)
 
 st.subheader(project_name)
 
+project_cop_url = PROJECT_URL.format(
+    project_name="-".join(
+        re.sub(
+            r"\W+",
+            " ",
+            project_name,
+        ).split(" ")
+    )
+    .lower()
+    .rstrip("-"),
+    project_id=project_id,
+)
+
+unit_price, tonnes_available = project_availability(project_cop_url)
+
+st.markdown(
+    f"Click [here]({project_cop_url}) to get to Carbon Offset Platform marketplace for this project"
+)
 st.markdown(f"Click [here]({project_url}) for more project information")
 
 st.write(
     "**Project Registration Date:**", datetime.strftime(registration_date, "%d %B %Y")
 )
+st.write("**Unit Price:**", unit_price)
+st.write("**Availability:**", tonnes_available)
 
 st.write(f"**Number of Contributions for Project {project_id}:**", len(df_history))
 

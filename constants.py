@@ -1,9 +1,15 @@
 CONTRIBUTION_HISTORY_BASE_URL = "https://offset.climateneutralnow.org/vchistory"
+CONTRIBUTION_HISTORY_URL = "https://offset.climateneutralnow.org/vchistory?ProjectId={project_id}&pageNumber={page}"
 CONTRIBUTION_REDIRECT_URL = "https://offset.climateneutralnow.org/changelanguage/1?returnUrl=%2Fvchistory%3FProjectIdString%3D{project_id}%26pageNumber%3D{page}"
+PROJECT_URL = "https://offset.climateneutralnow.org/{project_name}-{project_id}-"
 
 PROJECT_INFO_QUERY_URL = (
     "https://cdm.unfccc.int/Projects/storeSearchParameters?Ref={project_id}"
 )
+
+ATTESTATION_URL = "https://cdm.unfccc.int/Registry/vc_attest/index.html"
+ATTESTATION_2018_URL = "https://cdm.unfccc.int/Registry/vc_attest_old/index.html"
+ATTESTATION_ARCHIVE_URL = "https://cdm.unfccc.int/Registry/vc_attest_old/index_archive.html"
 
 CONTRIBUTION_METRIC_XPATHS = (
     '//*[@id="filter-grid-view-div-container"]/div/div[3]/div[2]/div[2]/div[1]/text()',
@@ -18,6 +24,16 @@ PROJECT_INFO_REGISTRATION_DATE_XPATH = (
     '//*[@id="projectsTable"]/table/tr[4]/td[1]/text()'
 )
 PROJECT_INFO_PROJECT_XPATH = '//*[@id="projectsTable"]/table/tr[4]/td[2]/a'
+
+PROJECT_AVAILABILITY_XPATH = '//*[@id="product-details-form"]'
+PROJECT_AVAILABILITY_PRICE_SUB_XPATH = 'section/div[2]/div[1]/p/text()'
+PROJECT_AVAILABILITY_TONNES_SUB_XPATH = 'section/div[2]/div[1]/table/tbody/tr[4]/td/text()'
+
+ATTESTATION_XPATH = '//*[@id="vc-attest"]/tbody/tr'
+
+ATTESTATION_ID_REGEX = r"\/(?P<year>\d{4})_(?P<suffix>\d+)_(?P<prefix>\w+)\%20"
+
+VC_CERTIFICATE = "{prefix}{suffix}/{year}"
 
 KNOWN_PROJECT_ID = (
     1,
